@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Wellness Coach – FutureStack25</title>
+    <style>
+    body { font-family: system-ui, sans-serif; max-width: 940px; margin: 24px auto; padding: 0 16px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin: 12px 0; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .btn { padding: 8px 14px; border-radius: 8px; border: 1px solid #333; background:#111; color:#fff; cursor:pointer; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; }
+    .insights { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+<h1>Wellness Coach (7-day Summary)</h1>
+
+<div class="card">
+    <h3>1) Upload Health Auto Export CSV</h3>
+    <p><small>Uses only the required columns you selected.</small></p>
+    <div class="row">
+        <input id="file" type="file" accept=".csv"/>
+        <button class="btn" onclick="upload()">Upload & Summarize</button>
+    </div>
+    <p id="status"></p>
+</div>
+
+<div class="card" id="summaryBox" style="display:none;">
+    <h3>2) 7-Day Summary</h3>
+    <table><tbody id="summary"></tbody></table>
+    <button class="btn" onclick="getInsights()">Get AI Insights</button>
+</div>
+
+<div class="card" id="insightsBox" style="display:none;">
+    <h3>3) Insights</h3>
+    <div class="insights" id="insights"></div>
+</div>
+
+<script>
+async function upload(){
+  const f = document.getElementById('file').files[0];
+  if(!f){ alert('Pick a CSV first.'); return; }
+  const fd = new FormData(); fd.append('file', f);
+  document.getElementById('status').textContent = 'Uploading...';
+
+  const res = await fetch('/api/health/upload', { method:'POST', body: fd });
+  if(!res.ok){ document.getElementById('status').textContent = 'Upload failed'; return; }
+  const s = await res.json();
+  document.getElementById('status').textContent = 'Summary computed!';
+  showSummary(s);
+}
+
+function showSummary(s){
+  const tbody = document.getElementById('summary'); tbody.innerHTML = '';
+  const rows = [
+    ['Active Energy (total)',       fmt(s.totalActiveEnergyKcal) + ' kcal'],
+    ['Resting Energy (total)',      fmt(s.totalRestingEnergyKcal) + ' kcal'],
+    ['Exercise (avg)',              fmt(s.avgExerciseMinPerDay) + ' min/day'],
+    ['Stand Hours (total)',         fmt(s.totalStandHours)],
+    ['Stand goal days (≥12h)',      s.standGoalDays],
+    ['Move goal days (≥500 kcal)',  s.moveGoalDays],
+    ['Distance (total)',            fmt(s.totalDistanceMi) + ' mi'],
+    ['Steps (total)',               s.totalSteps],
+
+    ['HR avg / min / max',          nz(s.hrAvg,'bpm') + ' / ' + nz(s.hrMin,'bpm') + ' / ' + nz(s.hrMax,'bpm')],
+    ['Resting HR avg / min / max',  nz(s.restingHrAvg,'bpm') + ' / ' + nz(s.restingHrMin,'bpm') + ' / ' + nz(s.restingHrMax,'bpm')],
+    ['HRV (median)',                nz(s.hrvMedianMs,'ms')],
+    ['Walking HR (avg)',            nz(s.walkHrAvg,'bpm')],
+
+    ['Walk speed (avg)',            nz(s.walkSpeedAvgMph,'mph')],
+    ['Step length (avg)',           nz(s.stepLenAvgIn,'in')],
+    ['Double support (avg)',        nz(s.doubleSupportAvgPct,'%')],
+    ['Asymmetry (avg)',             nz(s.asymmetryAvgPct,'%')],
+    ['Stairs up / down (avg)',      nz(s.stairUpAvgFtPerSec,'ft/s') + ' / ' + nz(s.stairDownAvgFtPerSec,'ft/s')],
+
+    ['Audio exposure (avg)',        nz(s.envAudioAvgDbA,'dBA')],
+    ['SpO₂ avg (min)',              nz(s.spo2AvgPct,'%') + ' (' + nz(s.spo2MinPct,'%') + ')'],
+  ];
+  rows.forEach(([k,v])=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<th>${k}</th><td>${v}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('summaryBox').style.display = 'block';
+}
+
+function nz(v, unit){
+  if(v===null || v===undefined) return 'n/a';
+  return unit ? `${v} ${unit}` : `${v}`;
+}
+function fmt(v){
+  if(v===null || v===undefined) return 'n/a';
+  return (typeof v === 'number') ? (Math.round(v*100)/100) : v;
+}
+
+async function getInsights(){
+  document.getElementById('insights').textContent = 'Thinking...';
+  document.getElementById('insightsBox').style.display='block';
+  const res = await fetch('/api/insights', { method:'POST' });
+  if(!res.ok){ document.getElementById('insights').textContent = 'Error calling AI.'; return; }
+  const txt = await res.text();
+  document.getElementById('insights').textContent = txt;
+}
+</script>
+</body>
+</html>
